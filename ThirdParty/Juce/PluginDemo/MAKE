@@ -1,0 +1,17 @@
+#!/bin/bash
+TARGET_NAME=JucePluginDemo.so
+TARGET_PATH=ThirdParty/Juce/PluginDemo
+product=$NEPTUNE/bazel-bin/$TARGET_PATH/$TARGET_NAME
+target=~/.vst/$TARGET_NAME
+
+rm -f $product
+bazel build -c opt $TARGET_PATH:$TARGET_NAME --define="mode=plugin"
+if [ -f $product ]; then
+  rm -f $target
+  cp $product $target
+  size=$(numfmt --to=iec-i --suffix=B --format="%.3f" $(stat --printf="%s" $target))
+  echo "Created file" $target \(${size}\)
+else
+  echo "Could not make $TARGET_NAME!"
+  exit 1
+fi

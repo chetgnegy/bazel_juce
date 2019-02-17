@@ -1,0 +1,22 @@
+###################################
+#          SYSTEM SETUP           #
+###################################
+See notes on configuring PulseAudio (Linux). This actually didn't get much mileage on Ubuntu.
+http://www.overclock.net/a/how-to-get-the-best-sound-with-and-properly-configure-pulseaudio
+
+Disabling audio input in the Juce plugin host, however, did mostly reduce glitching.
+
+###################################
+#          NEW PROJECTS           #
+###################################
+
+First and foremost, you'll need to implement a PluginProcessor and a PluginEditor.
+Following that, you'll want to make a few small edits in /ThirdParty/Juce/BUILD. Write a Config target containing all of the project-specific macros that are required when building Juce.
+
+That's all that is necessary to build. Remember to pass some command line flags when attempting to
+build.
+
+For example:
+blaze build MyProject:Main --define="project=badcodec" --define="mode=plugin"
+
+Without the last flag, you'll get an error about JucePlugin_Name being undefined.
