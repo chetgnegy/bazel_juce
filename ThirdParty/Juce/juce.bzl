@@ -13,19 +13,16 @@
 # sudo apt-get install libxrandr-dev   # See note about xrandr below.
 # Alsa:
 # sudo apt-get install libasound2-dev
+
 def juce_library(name = "Juce",
-                 plugin_defines = [],
+                 plugin_deps = [],
                  visibility = ["//visibility:public"]):
 
-    all_deps = plugin_defines + [
-        "//ThirdParty/Juce:JuceLibrary",
-        # TODO: Only use this when necessary.
-        "//ThirdParty/OpenGL:OpenGL",
-        "//ThirdParty/vst3_sdk:VST3",
-    ]
+    #########################
+    #        Defines        #
+    #########################
 
     all_defines = [
-        "LINUX=1",
         "JUCE_DEBUG=1",
         # This is needed to prevent the plugin window from repeatedly resizing whenever it is opened
         # until the program eventually crashes. I don't know why this is necessary.
@@ -52,23 +49,68 @@ def juce_library(name = "Juce",
         "JUCE_MODULE_AVAILABLE_juce_opengl=1",
         "JUCE_MODULE_AVAILABLE_juce_video=1",
     ]
+
     all_defines += select({
         "//ThirdParty/Juce:BuildForNeptune": ["JUCE_STANDALONE_APPLICATION=0"],
         "//conditions:default": [],
     })
 
-    all_srcs = [
-        "//ThirdParty/Juce:JuceSrcs"
-    ] + select({
-        "//ThirdParty/Juce:PluginMode": ["//ThirdParty/Juce:JucePluginFormats"],
-        "//conditions:default": [],
+    linux_defs = ["LINUX=1"]
+
+    osx_defs = [
+        "MAC_OS_X_VERSION_MIN_REQUIRED=MAC_OS_X_VERSION_10_5",
+        "DEBUG=1",
+    ]
+
+    all_defines += select({
+        "@bazel_tools//src/conditions:darwin": osx_defs,
+        "@bazel_tools//src/conditions:darwin_x86_64": osx_defs,
+        "//conditions:default": linux_defs,
     })
+
+    #########################
+    #     Dependencies      #
+    #########################
+
+    all_deps = plugin_deps + [
+        "//ThirdParty/Juce:JuceLibrary",
+        # TODO: Only use this when necessary.
+        "//ThirdParty/OpenGL:OpenGL",
+        "//ThirdParty/vst3_sdk:VST3",
+    ]
+
+    #########################
+    #      Main Target      #
+    #########################
+
+    linux_cc_library_target = name + "_linux"
+    osx_cc_library_target = name + "_osx"
+
     native.cc_library (
         name = name,
         visibility = visibility,
+        deps = select({
+            "@bazel_tools//src/conditions:darwin": [":" + osx_cc_library_target],
+            "@bazel_tools//src/conditions:darwin_x86_64": [":" + osx_cc_library_target],
+            "//conditions:default": [":" + linux_cc_library_target],
+        })
+    )
+
+    #########################
+    #    Linux Juce Build   #
+    #########################
+
+    native.cc_library (
+        name =  linux_cc_library_target,
+        visibility = ["//visibility:private"],
         defines = all_defines,
         deps = all_deps,
-        srcs = all_srcs,
+        srcs = [
+            "//ThirdParty/Juce:JuceSrcs"
+        ] + select({
+            "//ThirdParty/Juce:PluginMode": ["//ThirdParty/Juce:JucePluginFormats"],
+            "//conditions:default": [],
+        }),
         copts = [
             "-I/usr/include",
             "-I/usr/include/freetype2",
@@ -90,5 +132,61 @@ def juce_library(name = "Juce",
             "-lfreetype",
             "-lpthread",
             "-lrt",
+        ],
+    )
+
+    #########################
+    #     OSX Juce Build    #
+    #########################
+
+    osx_only_objc_library_target = name + "_osx_objc"
+
+    native.cc_library (
+        name = osx_cc_library_target,
+        visibility = ["//visibility:private"],
+        includes = ["JUCE/modules"],
+        defines = all_defines,
+        deps = all_deps + [":" + osx_only_objc_library_target],
+    )
+
+    native.objc_library (
+        name = osx_only_objc_library_target,
+        visibility = ["//visibility:private"],
+        defines = all_defines,
+        non_arc_srcs = [
+            "//ThirdParty/Juce:JuceSrcsMacOSX",
+        ] + select({
+            "//ThirdParty/Juce:PluginMode": ["//ThirdParty/Juce:JucePluginFormatsMacOSX"],
+            "//conditions:default": [],
+        }),
+        hdrs = [
+            "//ThirdParty/Juce:AllJuceFiles",
+            "//ThirdParty/Juce:JuceHeaders",
+        ],
+        copts = [
+            "-fPIC",
+            "-Wl,--no-undefined",
+            # "-fvisibility=hidden",  # Used in release mode.
+            "-march=native",
+            '-D__cdecl=//"//"',
+        ],
+        deps = all_deps,
+        sdk_frameworks = [
+            "Accelerate",
+            "AppKit",
+            "AudioToolbox",
+            "AudioUnit",
+            "Carbon",
+            "Cocoa",
+            "CoreAudio",
+            "CoreAudioKit",
+            "CoreMIDI",
+            # "DiskRecording",
+            "Foundation",
+            "IOKit",
+            "OpenGL",
+            "QTKit",
+            "QuartzCore",
+            "WebKit",
         ],
     )
