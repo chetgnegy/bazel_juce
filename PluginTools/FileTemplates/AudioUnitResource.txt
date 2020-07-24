@@ -1,0 +1,52 @@
+// This file was copied out of Juce 4.3.1 and modified to remove a lot of the legacy support
+// (PPC, 32-bit, and Carbon stuff).
+
+#define UseExtendedThingResource 1
+
+#include <AudioUnit/AudioUnit.r>
+
+//==============================================================================
+// component resources for Audio Unit
+#define RES_ID          1000
+#define COMP_TYPE       JucePlugin_AUMainType
+#define COMP_SUBTYPE    JucePlugin_AUSubType
+#define COMP_MANUF      JucePlugin_AUManufacturerCode
+#define VERSION         JucePlugin_VersionCode
+#define NAME            JucePlugin_Manufacturer ": " JucePlugin_Name
+#define DESCRIPTION     JucePlugin_Desc
+#define ENTRY_POINT     JucePlugin_AUExportPrefixQuoted "Entry"
+
+#include <CoreServices/CoreServices.r>
+
+#ifndef cmpThreadSafeOnMac
+#define cmpThreadSafeOnMac  0x10000000
+#endif
+
+resource 'STR ' (RES_ID, purgeable) {
+  NAME
+};
+
+resource 'STR ' (RES_ID + 1, purgeable) {
+  DESCRIPTION
+};
+
+resource 'dlle' (RES_ID) {
+  ENTRY_POINT
+};
+
+resource 'thng' (RES_ID, NAME) {
+  COMP_TYPE,
+  COMP_SUBTYPE,
+  COMP_MANUF,
+  0, 0, 0, 0,               //  no 68K
+  'STR ', RES_ID,
+  'STR ', RES_ID + 1,
+  0,  0,      /* icon */
+  VERSION,
+  componentHasMultiplePlatforms | componentDoAutoVersion,
+  0,
+  {
+      cmpThreadSafeOnMac,
+      'dlle', RES_ID, 8
+  }
+};

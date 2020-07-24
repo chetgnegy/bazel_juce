@@ -4,8 +4,7 @@ package (
 
 licenses(["notice"])
 
-# This rule exists only to satisfy the build generation scripts. All of the
-# dependencies for this are in system headers.
+# There is probably a better way to manage OpenGL than this. I'm not claiming this to be portable.
 cc_library (
     name = "OpenGL",
     hdrs = ["OpenGL.h"],

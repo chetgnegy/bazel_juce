@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+set -e
+
+DEPLOY="false"
+
+print_usage () {
+  echo "Usage: makescript -n <name> -b <binary> -r <resource_dir> [-d]"
+  echo "  name: human readable name (no spaces)"
+  echo "  binary: produced library containing the plugin, likely in a temp directory"
+  echo "  resource_dir: the location of generated resources, plists, etc."
+}
+
+# https://stackoverflow.com/questions/7069682/how-to-get-arguments-with-flags-in-bash
+while getopts 'n:b:r:d' flag; do
+  case "${flag}" in
+    n) NAME="${OPTARG}" ;;
+    b) BINARY="${OPTARG}" ;;
+    r) RESOURCES="${OPTARG}" ;;
+    d) DEPLOY="true" ;;
+    *) print_usage
+       exit 1 ;;
+  esac
+done
+
+[[ -z "$NAME" ]] && { echo "Name missing!" ; exit 1; }
+[[ -z "$BINARY" ]] && { echo "Binary missing!" ; exit 1; }
+[[ -z "$RESOURCES" ]] && { echo "Resource directory missing!" ; exit 1; }
+
+# Test the operating system.
+# https://stackoverflow.com/questions/3466166/how-to-check-if-running-in-cygwin-mac-or-linux
+if [ "$(uname)" == "Darwin" ]; then
+  OS=MACOSX
+elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+  OS=LINUX
+elif [ "$(expr substr $(uname -s) 1 10)" == "MINGW32_NT" ]; then
+  OS=WIN32
+elif [ "$(expr substr $(uname -s) 1 10)" == "MINGW64_NT" ]; then
+  OS=WIN64
+fi
+
+if [ "$OS" == "LINUX" ]; then
+  plugin_types=( vst )
+elif [ "$OS" == "MACOSX" ]; then
+  plugin_types=( vst vst3 au )
+fi
+
+for AUDIO_TYPE in "${plugin_types[@]}" ; do
+  if [ "$AUDIO_TYPE" == "vst" ]; then
+    echo "Generating VST plugin."
+  elif [ "$AUDIO_TYPE" == "vst3" ]; then
+    echo "Generating VST3 plugin."
+  elif [ "$AUDIO_TYPE" == "au" ]; then
+    echo "Generating AU plugin."
+  else
+    echo "Invalid audio type $AUDIO_TYPE given!"
+    exit 1
+  fi
+
+  if [ "$OS" == "LINUX" ]; then
+    if [ "$AUDIO_TYPE" == "au" ]; then
+      echo "AU type cannot be built on Linux. Skipping."
+      exit 0
+    fi
+    LOCAL_DIR=~/."$AUDIO_TYPE"
+    LOCAL_NAME="$NAME".so
+
+  elif [ "$OS" == "MACOSX" ]; then
+    LOCAL_DIR=~/vst
+    if [ "$AUDIO_TYPE" == "au" ]; then
+      LOCAL_NAME="$NAME".component
+    else
+      LOCAL_NAME="$NAME"."$AUDIO_TYPE"
+    fi
+  fi
+
+  # ARTIFACT is not the "set" name of the output, but the predicted name of the output.
+  # If this is wrong, you'll see a size of zero or an error about a missing file.
+  ARTIFACT="$LOCAL_DIR"/"$LOCAL_NAME"
+
+  # Copy the file out of the temporary directory.
+  if [ -f "$BINARY" ]; then
+    if [ "$OS" == "LINUX" ]; then
+      rm -f "$ARTIFACT"
+      cp "$BINARY" "$ARTIFACT"
+      size=$(numfmt --to=iec-i --suffix=B --format="%.2f" $(stat --printf="%s" $ARTIFACT))
+      echo "Created file $ARTIFACT" \(${size}\)
+
+    elif [ "$OS" == "MACOSX" ]; then
+      rm -rf "$ARTIFACT"
+      if [ "$AUDIO_TYPE" == "vst" ]; then
+        PluginTools/OSX/VST/verifyvst $BINARY
+        PluginTools/OSX/VST/makevst \
+            -n "$NAME" -l "$BINARY" -r "$RESOURCES" -d "$LOCAL_DIR"
+      elif [ "$AUDIO_TYPE" == "vst3" ]; then
+        PluginTools/OSX/VST/verifyvst3 $BINARY
+        PluginTools/OSX/VST/makevst \
+            -n "$NAME" -l "$BINARY" -r "$RESOURCES" -d "$LOCAL_DIR" -t
+      elif [ "$AUDIO_TYPE" == "au" ]; then
+        PluginTools/OSX/AU/verifyau $BINARY
+        PluginTools/OSX/AU/makeau \
+            -n "$NAME" -l "$BINARY" -r "$RESOURCES" -d "$LOCAL_DIR"
+      fi
+      echo "Created file:"
+      du -sch "$ARTIFACT"
+    fi
+
+  else
+    echo "Could not make $NAME!"
+    exit 1
+  fi
+
+  # Copy the file to the correct system directory.
+  if [ $DEPLOY == 'true' ]; then
+    if [ "$OS" == "LINUX" ]; then
+      VST_PATH="/usr/lib/lxvst/$NAME.so"
+      echo "Deploying $VST_PATH"
+      sudo cp "$ARTIFACT" "$VST_PATH"
+    elif [ "$OS" == "MACOSX" ]; then
+      if [ "$AUDIO_TYPE" == "vst" ]; then
+        SUBDIR=VST
+      elif [ "$AUDIO_TYPE" == "vst3" ]; then
+        SUBDIR=VST3
+      elif [ "$AUDIO_TYPE" == "au" ]; then
+        SUBDIR=Components
+      fi
+      sudo cp -rf $ARTIFACT /Library/Audio/Plug-Ins/"$SUBDIR"
+      sudo cp -rf $ARTIFACT /Users/Library/Audio/Plug-Ins/"$SUBDIR"
+    fi
+
+  else
+    echo "Artifacts not deployed. Use the -d flag to deploy."
+  fi
+done

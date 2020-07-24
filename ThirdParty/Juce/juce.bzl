@@ -15,7 +15,7 @@
 # sudo apt-get install libasound2-dev
 
 def juce_library(name = "Juce",
-                 plugin_deps = [],
+                 client_deps = [],
                  visibility = ["//visibility:public"]):
 
     #########################
@@ -51,9 +51,17 @@ def juce_library(name = "Juce",
     ]
 
     all_defines += select({
-        "//ThirdParty/Juce:BuildForNeptune": ["JUCE_STANDALONE_APPLICATION=0"],
+        "//ThirdParty/Juce:BuildForSharedLibrary": ["JUCE_STANDALONE_APPLICATION=0"],
         "//conditions:default": [],
     })
+
+    common_copts = [
+        "-fPIC",
+        "-Wl,--no-undefined",
+        "-Wno-deprecated-declarations",
+        "-march=native",
+        '-D__cdecl=//"//"',
+    ]
 
     linux_defs = ["LINUX=1"]
 
@@ -72,10 +80,10 @@ def juce_library(name = "Juce",
     #     Dependencies      #
     #########################
 
-    all_deps = plugin_deps + [
-        "//ThirdParty/Juce:JuceLibrary",
-        # TODO: Only use this when necessary.
+    all_deps = client_deps + [
+        "//ThirdParty/Juce:JuceLibraryTextualHdrs",
         "//ThirdParty/OpenGL:OpenGL",
+        "//ThirdParty/vst_sdk:VST",
         "//ThirdParty/vst3_sdk:VST3",
     ]
 
@@ -93,7 +101,7 @@ def juce_library(name = "Juce",
             "@bazel_tools//src/conditions:darwin": [":" + osx_cc_library_target],
             "@bazel_tools//src/conditions:darwin_x86_64": [":" + osx_cc_library_target],
             "//conditions:default": [":" + linux_cc_library_target],
-        })
+        }),
     )
 
     #########################
@@ -105,20 +113,10 @@ def juce_library(name = "Juce",
         visibility = ["//visibility:private"],
         defines = all_defines,
         deps = all_deps,
-        srcs = [
-            "//ThirdParty/Juce:JuceSrcs"
-        ] + select({
-            "//ThirdParty/Juce:PluginMode": ["//ThirdParty/Juce:JucePluginFormats"],
-            "//conditions:default": [],
-        }),
-        copts = [
+        srcs = ["//ThirdParty/Juce:JuceLinuxCppDeps"],
+        copts = common_copts + [
             "-I/usr/include",
             "-I/usr/include/freetype2",
-            "-fPIC",
-            "-Wl,--no-undefined",
-            # "-fvisibility=hidden",  # Used in release mode.
-            "-march=native",
-            '-D__cdecl=//"//"',
         ],
         linkopts = [
             "-L/usr/X11R6/lib/",
@@ -139,36 +137,30 @@ def juce_library(name = "Juce",
     #     OSX Juce Build    #
     #########################
 
-    osx_only_objc_library_target = name + "_osx_objc"
+    osx_objc_library_target = name + "_osx_objc"
 
     native.cc_library (
         name = osx_cc_library_target,
         visibility = ["//visibility:private"],
+        # This propagates the includes to the objc_library.
         includes = ["JUCE/modules"],
         defines = all_defines,
-        deps = all_deps + [":" + osx_only_objc_library_target],
+        deps = all_deps + [
+            ":" + osx_objc_library_target
+        ],
+        srcs = select({
+            "//ThirdParty/Juce:PluginMode": ["//ThirdParty/Juce:JucePluginCppDeps"],
+            "//conditions:default": [],
+        }),
     )
 
     native.objc_library (
-        name = osx_only_objc_library_target,
+        name = osx_objc_library_target,
         visibility = ["//visibility:private"],
         defines = all_defines,
-        non_arc_srcs = [
-            "//ThirdParty/Juce:JuceSrcsMacOSX",
-        ] + select({
-            "//ThirdParty/Juce:PluginMode": ["//ThirdParty/Juce:JucePluginFormatsMacOSX"],
-            "//conditions:default": [],
-        }),
-        hdrs = [
-            "//ThirdParty/Juce:AllJuceFiles",
-            "//ThirdParty/Juce:JuceHeaders",
-        ],
-        copts = [
-            "-fPIC",
-            "-Wl,--no-undefined",
-            # "-fvisibility=hidden",  # Used in release mode.
-            "-march=native",
-            '-D__cdecl=//"//"',
+        non_arc_srcs = ["//ThirdParty/Juce:JuceSrcsMacOSX"],
+        copts = common_copts + [
+            "-Wno-undeclared-selector",
         ],
         deps = all_deps,
         sdk_frameworks = [

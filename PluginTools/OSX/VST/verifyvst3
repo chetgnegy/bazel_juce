@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+# It's not clear that this is the best symbol to be searching for.
+IS_WORKING_VST=$( nm "$1" | grep initialiseMacVST | wc -l )
+# Check to make sure the main entry point to the VST Plugin symbol exists in the binary.
+if [[ $IS_WORKING_VST -eq 1 ]]; then
+  exit 0
+fi
+echo "Missing VST3 symbols! Check your linker flags!"
+exit 1

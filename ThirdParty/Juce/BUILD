@@ -8,30 +8,44 @@ load("//ThirdParty/Juce:juce.bzl", "juce_library")
 
 # Defines the location of the configuration flags that are used to build specific versions
 # of JUCE.
+# We do this so that we can generically include "ThirdParty/Juce:Juce" from various projects.
+# If you think this is gross and you'd prefer to depend on a more specific build of JUCE, you
+# can do what JuceForBinaryBuilder and JuceForPluginHost do below and omit this business about
+# --project=... flags.
 juce_library(  # name = "Juce"
-  plugin_defines = select({
-    ":BuildForMyProject": ["//MyProject:Config"],
+  client_deps = select({
+    ":BuildForSharedLibrary": ["//SharedLibrary:Config"],
+    ":BuildForJuceDemoPlugin": ["//ThirdParty/Juce/PluginDemo:AppConfig"],
     "//conditions:default": [],
   }),
   visibility = ["//visibility:public"],
 )
 
+# If you're building something in the SharedLibrary you can get away with omitting this flag.
+# However, that may no longer be true if //SharedLibrary:Config becomes non-trivial.
+# I believe this is possible only because we have a special condition for defining
+# JUCE_STANDALONE_APPLICATION in juce.bzl.
 config_setting(
-    name = "BuildForMyProject",
-    values = { "define": "project=project" },
+    name = "BuildForSharedLibrary",
+    values = { "define": "project=sharedlibrary" },
+)
+
+# Write your own version of this and the add an entry to the select statement above.
+config_setting(
+    name = "BuildForJuceDemoPlugin",
+    values = { "define": "project=juce_plugin_demo" },
 )
 
 config_setting(
     name = "PluginMode",
-    values = { "define": "mode=plugin" }
+    values = { "define": "mode=plugin" },
 )
 
 ####################################################################################################
 ##################################### JUCE PRIVATE BUILD RULES #####################################
 ####################################################################################################
-
 cc_library (
-    name = "JuceLibrary",
+    name = "JuceLibraryTextualHdrs",
     textual_hdrs = [
         "JuceHeader.h",
         "Juce.h",
@@ -48,30 +62,9 @@ cc_library (
 )
 
 filegroup(
-    name = "AllJuceFiles",
-    srcs = glob([
-        # Contains the main entry points into Juce.
-        "JUCE/modules/**/*.c",
-        "JUCE/modules/**/*.cpp",
-        "JUCE/modules/**/*.h",
-        # Contains the actual implementation details.
-        "JUCE/modules/*/**/*.c",
-        "JUCE/modules/*/**/*.cpp",
-        "JUCE/modules/*/**/*.h",
-    ]),
-)
-
-filegroup(
-    name = "JuceHeaders",
+    name = "JuceLinuxCppDeps",
     srcs = [
-        "JuceHeader.h",
-        "Juce.h",
-    ],
-)
-
-filegroup(
-    name = "JuceSrcs",
-    srcs = [
+        ":JucePluginCppDeps",
         "JUCE/modules/juce_audio_basics/juce_audio_basics.cpp",
         "JUCE/modules/juce_audio_devices/juce_audio_devices.cpp",
         "JUCE/modules/juce_audio_formats/juce_audio_formats.cpp",
@@ -84,7 +77,19 @@ filegroup(
         "JUCE/modules/juce_gui_basics/juce_gui_basics.cpp",
         "JUCE/modules/juce_gui_extra/juce_gui_extra.cpp",
         "JUCE/modules/juce_opengl/juce_opengl.cpp",
-    ]
+    ],
+)
+
+filegroup(
+    name = "JucePluginCppDeps",
+    srcs = select({
+        "//ThirdParty/Juce:PluginMode": [
+            "JUCE/modules/juce_audio_plugin_client/juce_audio_plugin_client_utils.cpp",
+            "JUCE/modules/juce_audio_plugin_client/juce_audio_plugin_client_VST2.cpp",
+            "JUCE/modules/juce_audio_plugin_client/juce_audio_plugin_client_VST3.cpp",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
@@ -102,36 +107,22 @@ filegroup(
         "JUCE/modules/juce_gui_basics/juce_gui_basics.mm",
         "JUCE/modules/juce_gui_extra/juce_gui_extra.mm",
         "JUCE/modules/juce_opengl/juce_opengl.mm",
-    ]
-)
-
-filegroup(
-    name = "JucePluginFormats",
-    srcs = [
-        "JUCE/modules/juce_audio_plugin_client/juce_audio_plugin_client_utils.cpp",
-        "JUCE/modules/juce_audio_plugin_client/VST/juce_VST_Wrapper.cpp",
-        "JUCE/modules/juce_audio_plugin_client/VST3/juce_VST3_Wrapper.cpp",
-    ]
-)
-
-filegroup(
-    name = "JucePluginFormatsMacOSX",
-    srcs = [
-        "JUCE/modules/juce_audio_plugin_client/juce_audio_plugin_client_VST_utils.mm",
-    ]
+    ] + select({
+        "//ThirdParty/Juce:PluginMode": [
+            "JUCE/modules/juce_audio_plugin_client/juce_audio_plugin_client_VST_utils.mm",
+            "JUCE/modules/juce_audio_plugin_client/juce_audio_plugin_client_AU_1.mm",
+            "JUCE/modules/juce_audio_plugin_client/juce_audio_plugin_client_AU_2.mm",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 juce_library(
     name = "JuceForBinaryBuilder",
-    plugin_deps = ["//ThirdParty/Juce/BinaryBuilder:AppConfig"],
+    client_deps = ["//ThirdParty/Juce/BinaryBuilder:AppConfig"],
 )
 
 juce_library(
     name = "JuceForPluginHost",
-    plugin_deps = ["//ThirdParty/Juce/PluginHost:AppConfig"],
-)
-
-juce_library(
-    name = "JuceForPluginDemo",
-    plugin_deps = ["//ThirdParty/Juce/PluginDemo:AppConfig"],
+    client_deps = ["//ThirdParty/Juce/PluginHost:AppConfig"],
 )

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# It is very easy to forget flags and have required symbols necessary for linking and making
+# plugins mysteriously not be there. This checks to see if your DAW will be able to read the
+# plugin.
+IS_WORKING_AU=$( nm "$1" | grep AUFactory | wc -l )
+# Check to make sure the main entry point to the symbol exists in the binary.
+if [[ $IS_WORKING_AU -eq 1 ]]; then
+  exit 0
+fi
+# See the note in make_plugin_demo.
+echo "Missing AU symbols! Check your linker flags!"
+exit 1
