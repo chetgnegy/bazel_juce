@@ -25,17 +25,10 @@ export WORKSPACE_DIRECTORY=...
 
 You'll need to fill in some dependencies, namely JUCE and the VST SDKs[https://github.com/steinbergmedia/vst3sdk]. See ThirdParty/vst*. Put folders [base, bin, pluginterfaces, ...] right in ThirdParty/vst3_sdk and [pluginterfaces, public.sdk] in vst_sdk. The BUILD file already knows what to do.
 
-I have JUCE configured like a git submodule. So to set that up, you can do:
+I have JUCE configured like a git submodule. So to set that up, you can do the following command. Because we're dinosaurs, it will checkout version 4.3.1.
 
-git submodules init
-
-# TODO: Remove this once I'm sure above command is sufficient
-  cd ThirdParty/Juce/
-  git submodule add https://github.com/juce-framework/JUCE
-and because we're dinosaurs, checkout version 4.3.1.
-  Now you're ready to try building the JUCE PluginDemo.
-  cd JUCE
-  git checkout fc9937d83201331eb00303b0fbc1b77d47ae27ac
+git submodule init
+git submodule upgrade
 
 Now you're ready to get started. Build the JUCE Demo Plugin.
 
