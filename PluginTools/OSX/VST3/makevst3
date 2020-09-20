@@ -1,19 +1,15 @@
 
 print_usage () {
-  echo "Usage: makevst -n <name> -l <path> -r <resources_dir> -d <destination> -t"
-  echo "  use -t to designate VST3"
+  echo "Usage: makevst -n <name> -l <path> -r <resources_dir> -d <destination>"
 }
 
-EXTENSION=vst
-
 # https://stackoverflow.com/questions/7069682/how-to-get-arguments-with-flags-in-bash
-while getopts 'n:l:r:d:t' flag; do
+while getopts 'n:l:r:d:' flag; do
   case "${flag}" in
     n) PLUGIN_NAME="${OPTARG}" ;;
     l) BINARY="${OPTARG}" ;;
     r) RESOURCES="${OPTARG}" ;;
     d) DESTINATION="${OPTARG}" ;;
-    t) EXTENSION=vst3 ;;
     *) print_usage
        exit 1 ;;
   esac
@@ -26,17 +22,17 @@ done
 
 # System folders.
 VST_FOLDER="$DESTINATION"
-VST_PACKAGE="$VST_FOLDER"/"$PLUGIN_NAME"."$EXTENSION"
+VST_PACKAGE="$VST_FOLDER"/"$PLUGIN_NAME".vst3
 VST_CONTENTS_FOLDER="$VST_PACKAGE"/Contents
 VST_MACOS_FOLDER="$VST_CONTENTS_FOLDER"/MacOS
 VST_RESOURCES_FOLDER="$VST_CONTENTS_FOLDER"/Resources
 
 # Set up the directory structure.
 rm -rf "$VST_PACKAGE"
-mkdir "$VST_PACKAGE" "$VST_CONTENTS_FOLDER" "$VST_MACOS_FOLDER" "$VST_RESOURCES_FOLDER"
+mkdir -p "$VST_PACKAGE" "$VST_CONTENTS_FOLDER" "$VST_MACOS_FOLDER" "$VST_RESOURCES_FOLDER"
 
 # We are emulating this XCode-only action.
-# INPUT_FOLDER="$WORKSPACE_ROOT/ThirdParty/Juce/JUCE/examples/audio\ plugin\ demo/Builds/MacOSX"
+# INPUT_FOLDER="$NEPTUNE/ThirdParty/Juce/JUCE/examples/audio\ plugin\ demo/Builds/MacOSX"
 # builtin-infoPlistUtility \
 #   "$INPUT_FOLDER"/Info-VST.plist \
 #   -genpkginfo "$VST_CONTENTS_FOLDER"/PkgInfo \
@@ -46,12 +42,12 @@ mkdir "$VST_PACKAGE" "$VST_CONTENTS_FOLDER" "$VST_MACOS_FOLDER" "$VST_RESOURCES_
 cp $RESOURCES/VST-Info.plist "$VST_CONTENTS_FOLDER"/Info.plist
 
 # TODO: Do this with a genrule.
-ROOT_VST_RESOURCES_FOLDER=$WORKSPACE_ROOT/PluginTools/OSX
-cp "$ROOT_VST_RESOURCES_FOLDER"/VST/PkgInfo "$VST_CONTENTS_FOLDER"/PkgInfo
+VST_RESOURCES_FOLDER=PluginTools/OSX
+cp "$VST_RESOURCES_FOLDER"/VST/PkgInfo "$VST_CONTENTS_FOLDER"/PkgInfo
 
 /Applications/Xcode.app/Contents/Developer/usr/bin/ibtool \
   --strip "$VST_RESOURCES_FOLDER"/RecentFilesMenuTemplate.nib \
-  --output-format human-readable-text "$NEPTUNE_VST_RESOURCES_FOLDER"/RecentFilesMenuTemplate.nib
+  --output-format human-readable-text "$VST_RESOURCES_FOLDER"/RecentFilesMenuTemplate.nib
 
 # Here we could combine binaries that were built for multiple architectures.
 # "$BINARY"/x86_64/"$PLUGIN_NAME" "$BINARY"/i386/"$PLUGIN_NAME" \

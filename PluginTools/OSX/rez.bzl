@@ -1,20 +1,22 @@
 # The purpose of this genrule is to generate the compiled resources. It is designed to replace this
-# a series of complicated commands that Juce's XCode projects use for an audio plugin. This was not 
+# a series of complicated commands that Juce's XCode projects use for an audio plugin. This was not
 # designed to be generally useful beyond this application.
 
 def generate_compiled_resource(name,
                                srcs,
                                out,
-                               visibility = ["//visibility:public"], 
+                               visibility = ["//visibility:public"],
                                **genrule_kwargs):
   developer_dir = "/Applications/Xcode.app/Contents/Developer"
   # This is the tool that is used for resource compilation.
   rez_tool = developer_dir + "/usr/bin/Rez"
-  
+  # I think this is only valid on older versions of OSX.
   au_defs = developer_dir + "/Extras/CoreAudio/AudioUnits/AUPublic/AUBase"
+  # ... and this one for newer versions.
+  more_au_defs = developer_dir + "/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AudioUnit.framework/Headers"
   carbon_defs = "/System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Versions/A/Headers"
 
-  sdk = developer_dir + "/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk"
+  sdk = developer_dir + "/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.15.sdk"
 
   extra_args = [
       "-d SystemSevenOrLater=1",
@@ -23,7 +25,7 @@ def generate_compiled_resource(name,
       "-d x86_64_YES",
       "-arch x86_64",
   ]
-  
+
   # *****************************************************
   # *                 COMPILE RESOURCES                 *
   # *****************************************************
@@ -33,12 +35,12 @@ def generate_compiled_resource(name,
       rez_tool,
       "-o $(location " + stage_one_out + ")",
       " ".join(extra_args),
-      " ".join(["-I " + x for x in [au_defs, carbon_defs]]),
+      " ".join(["-I " + x for x in [au_defs, more_au_defs, carbon_defs]]),
       "-isysroot " + sdk,
       # Not sure if more than one is tolerated.
       " ".join([("$(location " + x + ")") for x in srcs]),
   ]
-  
+
   native.genrule(
       name = "_compile_" + name,
       srcs = srcs,
@@ -51,8 +53,8 @@ def generate_compiled_resource(name,
 # *                 COLLECT RESOURCES                 *
 # *****************************************************
   stage_two_out = "stage_two_" + out
-  
-  res_merger_tool = developer_dir + "/usr/bin/ResMerger" 
+
+  res_merger_tool = developer_dir + "/usr/bin/ResMerger"
   dst_flag = "-dstIs DF"
 
   collector_components = [
@@ -71,14 +73,14 @@ def generate_compiled_resource(name,
 # *****************************************************
 # *                 PRODUCT RESOURCES                 *
 # *****************************************************
-  
+
   product_components = [
       res_merger_tool,
       "$(location " + stage_two_out + ")",   # srcs before flags.
       dst_flag,
       "-o $(location " + out + ")",
   ]
-  
+
   native.genrule(
       name = name,
       srcs = [stage_two_out],

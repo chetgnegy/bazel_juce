@@ -23,7 +23,7 @@ def juce_library(name = "Juce",
     #########################
 
     all_defines = [
-        "JUCE_DEBUG=1",
+        "GL_SILENCE_DEPRECATION=1",
         # This is needed to prevent the plugin window from repeatedly resizing whenever it is opened
         # until the program eventually crashes. I don't know why this is necessary.
         "JUCE_USE_XRANDR=0",
@@ -36,12 +36,14 @@ def juce_library(name = "Juce",
         "JUCE_MODULE_AVAILABLE_juce_audio_basics=1",
         "JUCE_MODULE_AVAILABLE_juce_audio_devices=1",
         "JUCE_MODULE_AVAILABLE_juce_audio_formats=1",
+        # TODO: Can I just make this zero instead of branching the deps?
         "JUCE_MODULE_AVAILABLE_juce_audio_plugin_client=1",
         "JUCE_MODULE_AVAILABLE_juce_audio_processors=1",
         "JUCE_MODULE_AVAILABLE_juce_audio_utils=1",
         "JUCE_MODULE_AVAILABLE_juce_core=1",
         "JUCE_MODULE_AVAILABLE_juce_cryptography=1",
         "JUCE_MODULE_AVAILABLE_juce_data_structures=1",
+        "JUCE_MODULE_AVAILABLE_juce_dsp=1",
         "JUCE_MODULE_AVAILABLE_juce_events=1",
         "JUCE_MODULE_AVAILABLE_juce_graphics=1",
         "JUCE_MODULE_AVAILABLE_juce_gui_basics=1",
@@ -57,7 +59,6 @@ def juce_library(name = "Juce",
 
     common_copts = [
         "-fPIC",
-        "-Wl,--no-undefined",
         "-Wno-deprecated-declarations",
         "-march=native",
         '-D__cdecl=//"//"',
@@ -66,8 +67,7 @@ def juce_library(name = "Juce",
     linux_defs = ["LINUX=1"]
 
     osx_defs = [
-        "MAC_OS_X_VERSION_MIN_REQUIRED=MAC_OS_X_VERSION_10_5",
-        "DEBUG=1",
+        "MAC_OS_X_VERSION_MIN_REQUIRED=MAC_OS_X_VERSION_10_10",
     ]
 
     all_defines += select({
@@ -76,6 +76,8 @@ def juce_library(name = "Juce",
         "//conditions:default": linux_defs,
     })
 
+    shared_includes = ["JUCE/modules/juce_audio_processors/format_types/VST3_SDK"]
+
     #########################
     #     Dependencies      #
     #########################
@@ -83,8 +85,6 @@ def juce_library(name = "Juce",
     all_deps = client_deps + [
         "//ThirdParty/Juce:JuceLibraryTextualHdrs",
         "//ThirdParty/OpenGL:OpenGL",
-        "//ThirdParty/vst_sdk:VST",
-        "//ThirdParty/vst3_sdk:VST3",
     ]
 
     #########################
@@ -113,20 +113,29 @@ def juce_library(name = "Juce",
         visibility = ["//visibility:private"],
         defines = all_defines,
         deps = all_deps,
+        includes = shared_includes,
         srcs = ["//ThirdParty/Juce:JuceLinuxCppDeps"],
         copts = common_copts + [
             "-I/usr/include",
             "-I/usr/include/freetype2",
+            "-I/usr/include/atk-1.0",
+            "-I/usr/include/cairo",
+            "-I/usr/include/gdk-pixbuf-2.0",
+            "-I/usr/include/glib-2.0",
+            "-I/usr/include/gtk-3.0",
+            "-I/usr/include/libsoup-2.4",
+            "-I/usr/include/pango-1.0",
+            "-I/usr/include/webkitgtk-4.0",
         ],
         linkopts = [
             "-L/usr/X11R6/lib/",
             "-lGL",
             "-lX11",
+            "-lcurl",
             "-lXext",
             "-lXinerama",
             "-lasound",
             "-ldl",
-            # "-shared",
             "-lfreetype",
             "-lpthread",
             "-lrt",
@@ -143,7 +152,7 @@ def juce_library(name = "Juce",
         name = osx_cc_library_target,
         visibility = ["//visibility:private"],
         # This propagates the includes to the objc_library.
-        includes = ["JUCE/modules"],
+        includes = ["JUCE/modules"] + shared_includes,
         defines = all_defines,
         deps = all_deps + [
             ":" + osx_objc_library_target
@@ -159,7 +168,10 @@ def juce_library(name = "Juce",
         visibility = ["//visibility:private"],
         defines = all_defines,
         non_arc_srcs = ["//ThirdParty/Juce:JuceSrcsMacOSX"],
+        includes = shared_includes,
         copts = common_copts + [
+            # https://github.com/bazelbuild/bazel/issues/5318
+            "-std=c++14",
             "-Wno-undeclared-selector",
         ],
         deps = all_deps,
@@ -173,7 +185,6 @@ def juce_library(name = "Juce",
             "CoreAudio",
             "CoreAudioKit",
             "CoreMIDI",
-            # "DiskRecording",
             "Foundation",
             "IOKit",
             "OpenGL",

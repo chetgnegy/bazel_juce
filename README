@@ -1,52 +1,43 @@
 ###################################
-#         README AND RANT         #
+#             README              #
 ###################################
 
 This is what my solution for using JUCE with bazel looks like. It allows me to build AU/VST plugins
-on OSX and VST plugins on Linux.
+on OSX and VST plugins on Linux and OSX.
 
-When I originally set this up a few years ago I was using JUCE 4.3.1 running OSX Lion.
-Things probably changed since then. If you know how to make this work on more recent versions
-of JUCE or OSX, please don't be a stranger.
+Tested on Catalina and Ubuntu with Juce 6.1. Are other things supported? I don't know.
 
-Disclaimer: I hated doing this work. I want to make plugins, not fuss with build systems.  I don't want to worry about what Apple broke, deprecated, or enforced when they updated their OS. I am one developer and don't have time to maintain support for the supposedly good decisions of software engineers all over the planet. If you are excited about using JUCE with bazel and you learn something that I don't know, be a friend and share it. I'm more than happy to work with others on maintaining this.
-
-Why was this so hard to do in the first place? Several reasons:
-bazel: When I started this, OSX support for bazel was in its infancy. I filed several bugs and waited to get fixed. Integrating third party libraries with bazel isn't so easy, though JUCE was especially hard. However, I am far happier with bazel than with XCode (not being cross-platform is only the first thing I hate about XCode). Support from the bazel teams has been good and except for the complaints I just mentioned, I am exceptionally happy with their product. I especially like using it with gTest [https://github.com/google/googletest].
-
-JUCE: JUCE is very complicated in the way it is built. To JUCE's credit, they're working hard to keep a ton of little messes from being my problem (like multi-OS support for plugins without me having to know how horrible working with VSTs or AUs directly might be). This complication is hidden by the ProJuicer, which is fine unless you like the command line and like knowing what is being managed behind the scenes. JUCE has (maybe had, I don't know anymore) a backwards dependency on your project in the form of the AppConfig.h file. In other words, you don't really build it as a standalone. That's not a problem if you have one project or prefer to work in self-contained project libraries, but I personally prefer to use a monorepo [https://en.wikipedia.org/wiki/Monorepo] and so sharing JUCE across projects isn't obviously easy. I configure this using a per-project flag. It's a little annoying, and I'm interested in better solutions if you have them.
+JUCE is very complicated in the way it is built. To the JUCE team's credit, they're working hard to keep a ton of little messes from being my problem (like multi-OS support for plugins without me having to know how horrible working with VSTs or AUs directly might be). This complication is hidden by the ProJuicer, which is fine unless you like the command line and like knowing what is being managed behind the scenes. JUCE has a backwards dependency on your project in the form of preprocessor macros. In other words, you don't really build it as a standalone. That's not a problem if you have one project or prefer to work in self-contained project libraries, but I personally prefer to use a monorepo [https://en.wikipedia.org/wiki/Monorepo] and so sharing JUCE across projects isn't obviously easy. I configure this using a per-project flag. It's a little annoying, and I'm interested in better solutions if you have them.
 
 ###################################
 #          SYSTEM SETUP           #
 ###################################
-First install bazel, obviously. Most of my scripts require a bash variable to be defined. Just set this to wherever your bazel WORKSPACE lives.
+First install bazel, obviously. Most (maybe all) of my scripts are intended to be run from the WORKSPACE directory.
 
-export WORKSPACE_DIRECTORY=...
-
-You'll need to fill in some dependencies, namely JUCE and the VST SDKs[https://github.com/steinbergmedia/vst3sdk]. See ThirdParty/vst*. Put folders [base, bin, pluginterfaces, ...] right in ThirdParty/vst3_sdk and [pluginterfaces, public.sdk] in vst_sdk. The BUILD file already knows what to do.
-
-I have JUCE configured like a git submodule. So to set that up, you can do the following command. Because we're dinosaurs, it will checkout version 4.3.1.
+I have JUCE configured like a git submodule. So to set that up, you can do the following command. It will checkout version 6.0.1.
 
 git submodule init
-git submodule upgrade
+git submodule update
 
 Now you're ready to get started. Build the JUCE Demo Plugin.
 
 bazel build -c opt --copt=-fvisibility-inlines-hidden \
-  ThirdParty/Juce/PluginDemo:JuceDemoPlugin.so \
+  MyAwesomePlugin/MyAwesomePlugin.so \
   --define="mode=plugin" \
-  --define="project=juce_plugin_demo" \
+  --define="project=my_awesome_plugin" \
   --noincompatible_remove_legacy_whole_archive
 
-If you're thinking to yourself that that's horrible, I agree and that's why I wrote the make_plugin_demo script. In general, you only need the copts and the final flag when you're building the final plugin. If you're just testing its dependencies in a cc_test or something you don't need them. They have only to do with building the shared library.
+If you're thinking to yourself that that's horrible, I agree and that's why I wrote the MyAwesomePlugin/MAKE script. It's not a proper makefile, you can yell at me if you want, I guess. In general, you only need the copts and the final flag when you're building the final plugin. If you're just testing its dependencies in a cc_test or something you don't need them. They have only to do with building the shared library.
 
-Most of JUCE's examples could be built this way if you desire to write build rules like the ones in ThirdParty/Juce/PluginDemo/BUILD. It's mostly copy paste.
+Sorry I no longer have build rules for things like the JUCE plugin demo. JUCE's demos get more and more complicated if you aren't using the Projuicer and I could be bothered to learn what a PIP is or how to make it work with Bazel.
 
-Looking at those --define flags, that is the manifestation of the backwards dependency I mentioned in my grumpy rant above. If you look through the ThirdParty/Juce/BUILD file you can see that that isn't required for building the BinaryBuilder or the PluginHost (two very useful JUCE packages that I wrote BUILD rules for). Since those and all of their dependencies can rely on the same JUCE target, you can make a special JUCE target that doesn't involve those flags. I use those flags as a way to support having a shared codebase (SharedLibrary is my minimal example in this repo) and several project that depend on them (PluginDemo doesn't depend on my shared library, but with this setup, it could).
+Looking at those --define flags, that is the manifestation of the backwards dependency I mentioned above. If you look through the ThirdParty/Juce/BUILD file you can see that that isn't required for building the PluginHost. Since those and all of their dependencies can rely on the same JUCE target, you can make a special JUCE target that doesn't involve those flags. I use those flags as a way to support having a shared codebase (SharedLibrary is my minimal example in this repo) and several project that depend on them (PluginDemo doesn't depend on my shared library, but with this setup, it could).
 
-If you run make_plugin_demo, it will do some stuff behind the scenes and make your a plugin file. Add the -d flag and it will deploy the library to your VST/AU folders. Once you've done that, you can test this using the PluginHost.
+If you run MyAwesomePlugin/MAKE, it will do some stuff behind the scenes and make your a plugin file. Add the -d flag and it will deploy the library to your VST/AU folders. Once you've done that, you can test this using the PluginHost.
 
-bazel run -c opt ThirdParty/Juce/PluginHost:App
+ThirdParty/Juce/PluginHost/RUN
+
+It is convenient to pass a graph with the -g flag to this script so you can have a pre-built pluginhost graph.
 
 You may have to scan for plugins and all the usual things.
 

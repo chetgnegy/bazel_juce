@@ -1,0 +1,38 @@
+#!/bin/bash
+set -e # Quit at the first error.
+
+print_usage () {
+  echo "Usage: makescript -n <name> -b <binary> -r <resource_dir> [-d]"
+  echo "  name: human readable name (no spaces)"
+  echo "  binary: produced library containing the plugin, likely in a temp directory"
+  echo "  resource_dir: the location of generated resources, plists, etc."
+}
+
+# https://stackoverflow.com/questions/7069682/how-to-get-arguments-with-flags-in-bash
+while getopts 'g:' flag; do
+  case "${flag}" in
+    g) GRAPH="${OPTARG}" ;;
+    *) print_usage
+       exit 1 ;;
+  esac
+done
+
+[[ -z "$GRAPH" ]] && { echo "Graph missing!" ; exit 1; }
+
+ThirdParty/Juce/PluginHost/MAKE
+
+if [ "$(uname)" == "Darwin" ]; then
+  OS=MACOSX
+elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+  OS=LINUX
+elif [ "$(expr substr $(uname -s) 1 10)" == "MINGW32_NT" ]; then
+  OS=WIN32
+elif [ "$(expr substr $(uname -s) 1 10)" == "MINGW64_NT" ]; then
+  OS=WIN64
+fi
+
+if [ "$OS" == "LINUX" ]; then
+  ./bazel-bin/ThirdParty/Juce/PluginHost "$GRAPH"
+elif [ "$OS" == "MACOSX" ]; then
+  open bazel-bin/ThirdParty/Juce/PluginHost.app "$GRAPH"
+fi

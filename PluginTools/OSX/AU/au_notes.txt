@@ -1,0 +1,33 @@
+There are many annoying steps involved in building AUs. Without the JUCE Xcode project, we'd never be able to figure out any of this crap. This was generated from the build instructions on Catalina. If the gods smile upon us, the process won't change in the future. The gods never smile on me.
+
+The instructions XCode are listed below. In most cases, they happen in a different order in our build. With Bazel we build the binary first and assemble the resources later. In most cases, the order seems not to matter.
+
+1. Create product structure.
+  For us, this happens in makeau. It's just making a handful of folders.
+2. Process Info-AU.plist
+  There is a genrule that is automatically added to the BUILD file called AudioUnitInfoPList. This takes a template plist file and fills it in with the names of the plugin and so on. There is a copy/paste operation where in makeau that takes this generated plist and copies it into the project.
+  There is a resourceUsage key that we currently don't use at all. It's possible that that will cause permission problems for those that require them. There are other things like SDK numbers that we could be more careful about in here. But geez, just be glad if your thing builds at all.
+3. Make symlink <>.component
+  This isn't necessary because we don't care whether there is a link to our component in the JUCE project folder. We don't have a JUCE project folder.
+4. Process NIB file RecentFilesMenuTemplate.nib
+  This happens in makeau as well. Ctrl+F for ibtool
+5. Rez include_juce_audio_plugin_client_AU.r.
+  This happens in our rez.bzl file.
+6 and 7. Merge resources into <>.rsrc
+8 and 9. Compile include_juce_audio_plugin_client_AU_{1,2}.mm
+  When we compile our project we include these files. We specify this by having the AU building enabled in our JUCE flags and by including the --define="mode=plugin" flag.
+10. Link binary.
+  This also happens during the building stage.
+
+We also copy a PkgInfo file into the component. I don't know where XCode does this.
+
+VST3s are conceptually the same except you don't have to do steps 5-9 and you instead compile juce_audio_plugin_client_VST3.cpp.
+
+--- Legacy ---
+
+Lipo was used in older versions of OSX to merge binaries for different architectures into a single folder. You would only have to do this if you intended to support older computers. The command looks like this.
+
+# "$BINARY"/x86_64/"$PLUGIN_NAME" "$BINARY"/i386/"$PLUGIN_NAME" \
+/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo \
+  -create "$BINARY" \
+  -output "$AU_MACOS_FOLDER"/"$PLUGIN_NAME"

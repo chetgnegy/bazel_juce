@@ -1,0 +1,26 @@
+#!/bin/bash
+set -e # Quit at the first error.
+
+bazel build -c opt ThirdParty/Juce:PluginHost
+RESOURCES_DIR="ThirdParty/Juce"
+OUT_DIR="bazel-bin/$RESOURCES_DIR"
+APP_NAME="$OUT_DIR/PluginHost.app"
+
+if [ "$(uname)" == "Darwin" ]; then
+  OS=MACOSX
+elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+  OS=LINUX
+elif [ "$(expr substr $(uname -s) 1 10)" == "MINGW32_NT" ]; then
+  OS=WIN32
+elif [ "$(expr substr $(uname -s) 1 10)" == "MINGW64_NT" ]; then
+  OS=WIN64
+fi
+
+# It would be really nice to be able to build these resources from scratch, but
+# for now we just copy them.
+if [ "$OS" == "MACOSX" ]; then
+  rm -rf "$APP_NAME"
+  mkdir -p "$APP_NAME"
+  cp -rf "$RESOURCES_DIR/PluginHost/Contents" "$APP_NAME"
+  cp "$OUT_DIR/PluginHost" "$APP_NAME/Contents/MacOS/AudioPluginHost"
+fi

@@ -39,15 +39,13 @@ elif [ "$(expr substr $(uname -s) 1 10)" == "MINGW64_NT" ]; then
 fi
 
 if [ "$OS" == "LINUX" ]; then
-  plugin_types=( vst )
+  plugin_types=( vst3 )
 elif [ "$OS" == "MACOSX" ]; then
-  plugin_types=( vst vst3 au )
+  plugin_types=( vst3 au )
 fi
 
 for AUDIO_TYPE in "${plugin_types[@]}" ; do
-  if [ "$AUDIO_TYPE" == "vst" ]; then
-    echo "Generating VST plugin."
-  elif [ "$AUDIO_TYPE" == "vst3" ]; then
+  if [ "$AUDIO_TYPE" == "vst3" ]; then
     echo "Generating VST3 plugin."
   elif [ "$AUDIO_TYPE" == "au" ]; then
     echo "Generating AU plugin."
@@ -61,9 +59,8 @@ for AUDIO_TYPE in "${plugin_types[@]}" ; do
       echo "AU type cannot be built on Linux. Skipping."
       exit 0
     fi
-    LOCAL_DIR=~/."$AUDIO_TYPE"
-    LOCAL_NAME="$NAME".so
-
+    LOCAL_DIR=~/.vst3
+    LOCAL_NAME="$NAME".vst3
   elif [ "$OS" == "MACOSX" ]; then
     LOCAL_DIR=~/vst
     if [ "$AUDIO_TYPE" == "au" ]; then
@@ -80,21 +77,19 @@ for AUDIO_TYPE in "${plugin_types[@]}" ; do
   # Copy the file out of the temporary directory.
   if [ -f "$BINARY" ]; then
     if [ "$OS" == "LINUX" ]; then
-      rm -f "$ARTIFACT"
-      cp "$BINARY" "$ARTIFACT"
-      size=$(numfmt --to=iec-i --suffix=B --format="%.2f" $(stat --printf="%s" $ARTIFACT))
+      rm -rf "$ARTIFACT"
+      size=$(numfmt --to=iec-i --suffix=B --format="%.2f" $(stat --printf="%s" $BINARY))
       echo "Created file $ARTIFACT" \(${size}\)
+      PluginTools/Linux/VST3/verifyvst3 $BINARY
+      PluginTools/Linux/VST3/makevst3 \
+         -n "$NAME" -l "$BINARY" -r "$RESOURCES" -d "$LOCAL_DIR"
 
     elif [ "$OS" == "MACOSX" ]; then
       rm -rf "$ARTIFACT"
-      if [ "$AUDIO_TYPE" == "vst" ]; then
-        PluginTools/OSX/VST/verifyvst $BINARY
-        PluginTools/OSX/VST/makevst \
+      if [ "$AUDIO_TYPE" == "vst3" ]; then
+        PluginTools/OSX/VST3/verifyvst3 $BINARY
+        PluginTools/OSX/VST3/makevst3 \
             -n "$NAME" -l "$BINARY" -r "$RESOURCES" -d "$LOCAL_DIR"
-      elif [ "$AUDIO_TYPE" == "vst3" ]; then
-        PluginTools/OSX/VST/verifyvst3 $BINARY
-        PluginTools/OSX/VST/makevst \
-            -n "$NAME" -l "$BINARY" -r "$RESOURCES" -d "$LOCAL_DIR" -t
       elif [ "$AUDIO_TYPE" == "au" ]; then
         PluginTools/OSX/AU/verifyau $BINARY
         PluginTools/OSX/AU/makeau \
@@ -124,7 +119,6 @@ for AUDIO_TYPE in "${plugin_types[@]}" ; do
         SUBDIR=Components
       fi
       sudo cp -rf $ARTIFACT /Library/Audio/Plug-Ins/"$SUBDIR"
-      sudo cp -rf $ARTIFACT /Users/Library/Audio/Plug-Ins/"$SUBDIR"
     fi
 
   else

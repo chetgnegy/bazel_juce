@@ -10,6 +10,7 @@
 #include "JUCE/modules/juce_core/juce_core.h"
 #include "JUCE/modules/juce_cryptography/juce_cryptography.h"
 #include "JUCE/modules/juce_data_structures/juce_data_structures.h"
+#include "JUCE/modules/juce_dsp/juce_dsp.h"
 #include "JUCE/modules/juce_events/juce_events.h"
 #include "JUCE/modules/juce_graphics/juce_graphics.h"
 #include "JUCE/modules/juce_gui_basics/juce_gui_basics.h"

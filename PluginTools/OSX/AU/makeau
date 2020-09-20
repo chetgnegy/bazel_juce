@@ -1,5 +1,3 @@
-# This was cobbled together by looking at how XCode builds AU plugins. I have no idea if it works
-# on modern versions of JUCE.
 
 print_usage () {
   echo "Usage: makeau -n <name> -l <path> -r <resources_dir> -d <destination>"
@@ -31,10 +29,10 @@ AU_RESOURCES_FOLDER="$AU_CONTENTS_FOLDER"/Resources
 
 # Set up the directory structure.
 rm -rf "$AU_PACKAGE"
-mkdir "$AU_PACKAGE" "$AU_CONTENTS_FOLDER" "$AU_MACOS_FOLDER" "$AU_RESOURCES_FOLDER"
+mkdir -p "$AU_PACKAGE" "$AU_CONTENTS_FOLDER" "$AU_MACOS_FOLDER" "$AU_RESOURCES_FOLDER"
 
 # We are emulating this XCode-only action.
-# INPUT_FOLDER="/ThirdParty/Juce/JUCE/examples/audio\ plugin\ demo/Builds/MacOSX"
+# INPUT_FOLDER="$NEPTUNE/ThirdParty/Juce/JUCE/examples/audio\ plugin\ demo/Builds/MacOSX"
 # builtin-infoPlistUtility \
 #   "$INPUT_FOLDER"/Info-AU.plist \
 #   -genpkginfo "$AU_CONTENTS_FOLDER"/PkgInfo \
@@ -46,12 +44,12 @@ cp $RESOURCES/AudioUnit-Info.plist "$AU_CONTENTS_FOLDER"/Info.plist
 # Move the resources file
 cp $RESOURCES/CompiledResources.rsrc "$AU_RESOURCES_FOLDER"/"$PLUGIN_NAME".rsrc
 
-ROOT_AU_RESOURCES_FOLDER=$WORKSPACE_ROOT/PluginTools/OSX
-cp "$ROOT_AU_RESOURCES_FOLDER"/AU/PkgInfo "$AU_CONTENTS_FOLDER"/PkgInfo
+AU_RESOURCES_FOLDER=PluginTools/OSX
+cp "$AU_RESOURCES_FOLDER"/AU/PkgInfo "$AU_CONTENTS_FOLDER"/PkgInfo
 
 /Applications/Xcode.app/Contents/Developer/usr/bin/ibtool \
   --strip "$AU_RESOURCES_FOLDER"/RecentFilesMenuTemplate.nib \
-  --output-format human-readable-text "$ROOT_AU_RESOURCES_FOLDER"/RecentFilesMenuTemplate.nib
+  --output-format human-readable-text "$AU_RESOURCES_FOLDER"/RecentFilesMenuTemplate.nib
 
 # Here we could combine binaries that were built for multiple architectures.
 # "$BINARY"/x86_64/"$PLUGIN_NAME" "$BINARY"/i386/"$PLUGIN_NAME" \

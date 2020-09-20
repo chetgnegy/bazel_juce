@@ -1,0 +1,33 @@
+#!/bin/bash
+print_usage () {
+  echo "Usage: nep make MyAwesomePlugin [-d]"
+}
+
+EXTRA_FLAGS=""
+# https://stackoverflow.com/questions/7069682/how-to-get-arguments-with-flags-in-bash
+while getopts 'd' flag; do
+  case "${flag}" in
+    d) EXTRA_FLAGS="-d" ;;
+    *) print_usage
+       exit 1 ;;
+  esac
+done
+
+set -e
+# Delete previous built binary so that we know we aren't working with stale information.
+BINARY=bazel-bin/MyAwesomePlugin/MyAwesomePlugin.so
+rm -f "$BINARY"
+# The linker visibility flag is important. It hides symbols so there aren't clashes when multiple
+# plugins are in use. The bazel flag noincompatible_remove_legacy_whole_archive prevents symbols
+# from being stripped off as well.
+bazel build -c opt --copt=-fvisibility-inlines-hidden \
+  MyAwesomePlugin:MyAwesomePlugin.so \
+  --define="project=my_awesome_plugin" \
+  --define="mode=plugin" \
+  --noincompatible_remove_legacy_whole_archive
+
+PluginTools/makescript \
+  -n MyAwesomePlugin \
+  -b "$BINARY" \
+  -r "$NEPTUNE/bazel-bin/MyAwesomePlugin" \
+  "$EXTRA_FLAGS"
